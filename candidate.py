@@ -7,15 +7,11 @@ This is a temporary script file.
 import numpy as np 
 import cv2
 import dlib
-import os
-from subprocess import call
 from facefrontal import facefrontal
 
 tar_dir = 'target/'
 inp_dir = 'input/'
 outp_dir= 'output/'
-fps = 30
-size = (1280, 720)
 
 pdctdir = 'reference/shape_predictor_68_face_landmarks.dat'
 detector = dlib.get_frontal_face_detector()
@@ -92,7 +88,12 @@ def mask_inpaint(path):
 def optimize_sigma(L2, n, alpha):
     left, right = 0, 1
     epsilon = 1e-2
+    i, maxI = 0, 20
     while True:
+        if(i == maxI):
+            raise Exception("Infinite loop in optimize_sigma()!")
+        i += 1
+        
         sigma = (left + right) / 2
         weights = np.exp(-L2 / (2 * sigma**2))
         indices = np.argsort(weights)[::-1] # large -> small
@@ -136,43 +137,6 @@ def weighted_median(inpS, tgtS, tgtI, n, alpha=0.9):
                 idx = locate_median(weights_sort)
                 outpI[y, x, c] = intencity[indices[idx]]
     return outpI            
-
-def combine(mp4_path, mp3_path):
-    bdir, namext = os.path.split(mp4_path)
-    name, _ = os.path.splitext(namext)
-    outp_path = bdir + '/' + name + '.mp4'
-    command = 'ffmpeg -i ' + mp4_path + ' -i ' + mp3_path + ' -c:v copy -c:a aac -strict experimental ' + outp_path
-    call(command)
-    os.remove(mp4_path)
-    return outp_path
-
-def lowerface(mp3_path, inp_path, tar_path, preproc=False, n=50, rsize=150, startfr=300, endfr=None):
-    # preprocess target video
-    inp_dir, filename = os.path.split(inp_path)
-    inp_id, _ = os.path.splitext(filename)
-    tar_dir, filename = os.path.split(tar_path)
-    tar_id, _ = os.path.splitext(filename)
-    tmp_path = tar_dir+tar_id+'.npz'  
-    if preproc or os.path.exists(tmp_path) == False:
-        sq = Square(0.2, 0.8, 0.40, 1.00)
-        preprocess(tar_path, tmp_path, sq, rsize, startfr, endfr)
-        
-    tgtdata = np.load(tmp_path)
-    tgtS, tgtI = tgtdata['landmarks'], tgtdata['textures']
-    inpdata = np.load(inp_path)
-    
-    avi_path = outp_dir+inp_id+' x '+tar_id+'.avi'
-    writer = cv2.VideoWriter(avi_path+inp_id+' x '+tar_id+'.avi', cv2.VideoWriter_fourcc(*'DIVX'), fps, size)
-    for cnt, inpS in enumerate(inpdata):
-        print(cnt)
-        outpI = weighted_median(inpS, tgtS, tgtI, n)
-        
-        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-        upper, left = (360, 560)
-        frame[upper:upper+rsize, left:left+rsize, :] = outpI
-        writer.write(frame)
-        
-    return combine(avi_path, mp3_path)
 
 sq = Square(0.2, 0.8, 0.40, 1.00)
 if __name__ == '__main__':
