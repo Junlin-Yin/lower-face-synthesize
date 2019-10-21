@@ -17,6 +17,11 @@ pdctdir = 'reference/shape_predictor_68_face_landmarks.dat'
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor(pdctdir)
 
+black_lower = np.array([0, 0, 0])
+black_upper = np.array([180, 255, 46])
+white_lower = np.array([0, 0, 46])
+white_upper = np.array([180, 50, 255])
+
 class Square:
     def __init__(self, l, r, u, d):
         self.left = l
@@ -30,7 +35,14 @@ class Square:
         pt1   = pt1.astype(np.uint)
         pt2 = pt2.astype(np.uint)
         return Square(pt1[0], pt2[0], pt1[1], pt2[1])
-        
+
+def mask_inpaint(img):
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    mask1 = cv2.inRange(hsv, black_lower, black_upper)
+    mask2 = cv2.inRange(hsv, white_lower, white_upper)
+    mask = mask1 | mask2
+    mimg = cv2.inpaint(img, mask, 10, cv2.INPAINT_TELEA)
+    return mimg        
         
 def preprocess(mp4_path, save_path, sq, rsize, startfr=300, endfr=None):
     '''
@@ -48,10 +60,11 @@ def preprocess(mp4_path, save_path, sq, rsize, startfr=300, endfr=None):
     cap.set(cv2.CAP_PROP_POS_FRAMES, startfr)
     cnt = startfr
     endfr = cap.get(cv2.CAP_PROP_FRAME_COUNT) if endfr is None else endfr
+    print('Start preprocessing...')
     while cap.isOpened():
         if cnt == endfr:
             break
-        print(cnt)
+        print("%04d/%04d" % (cnt, endfr-1))
         cnt += 1
         
         ret, img_ = cap.read()
@@ -74,6 +87,10 @@ def preprocess(mp4_path, save_path, sq, rsize, startfr=300, endfr=None):
         # clip the lower face image
         ssq = sq.align(origin, size)
         txtr = img[ssq.up:ssq.down, ssq.left:ssq.right]
+        
+        # mask & inpaint for clothes region
+        txtr = mask_inpaint(txtr)
+        
         txtr = cv2.resize(txtr, (rsize, rsize))
 #        cv2.imwrite('tmp/'+str(cnt)+'_clip.png', txtr)
         textures.append(txtr)
@@ -81,9 +98,6 @@ def preprocess(mp4_path, save_path, sq, rsize, startfr=300, endfr=None):
     landmarks = np.array(landmarks)
     textures = np.array(textures)
     np.savez(save_path, landmarks=landmarks, textures=textures)
-
-def mask_inpaint(path):
-    pass
 
 def optimize_sigma(L2, n, alpha):
     left, right = 0, 1
@@ -138,8 +152,10 @@ def weighted_median(inpS, tgtS, tgtI, n, alpha=0.9):
                 outpI[y, x, c] = intencity[indices[idx]]
     return outpI            
 
-sq = Square(0.2, 0.8, 0.40, 1.00)
-if __name__ == '__main__':
+def teeth_proxy(img, pxy1, pxy2):
+    pass
+
+def test1():
 #    tar_id = "target001"
 #    savepath = preprocess(tar_dir+tar_id+'.mp4', sq, rsize=150, startfr=300)
     savepath = 'target/target001.npz'
@@ -154,3 +170,28 @@ if __name__ == '__main__':
     
     cv2.imshow('title', outp)
     cv2.waitKey(0)
+    
+def test2():
+    import os
+    imgfiles = os.listdir('tmp/')
+    for imgfile in imgfiles:
+        img = cv2.imread('tmp/' + imgfile)
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        black_lower = np.array([0, 0, 0])
+        black_upper = np.array([180, 255, 46])
+        white_lower = np.array([0, 0, 46])
+        white_upper = np.array([180, 50, 255])
+        mask1 = cv2.inRange(hsv, black_lower, black_upper)
+        mask2 = cv2.inRange(hsv, white_lower, white_upper)
+        mask = mask1 | mask2
+        
+        cv2.imshow('mask', mask)
+        cv2.waitKey(0)
+        
+        masked = cv2.inpaint(img, mask, 10, cv2.INPAINT_TELEA)
+        
+        cv2.imshow('masked', masked)
+        cv2.waitKey(0)    
+    
+if __name__ == '__main__':
+    print('Hello, World')
