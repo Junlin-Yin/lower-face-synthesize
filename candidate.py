@@ -29,12 +29,12 @@ class Square:
         self.up = u
         self.down = d
         
-    def align(self, origin, scale):
-        pt1 = np.array([self.left, self.up]) * scale + origin
-        pt2 = np.array([self.right, self.down]) * scale + origin
-        pt1   = pt1.astype(np.uint)
-        pt2 = pt2.astype(np.uint)
-        return Square(pt1[0], pt2[0], pt1[1], pt2[1])
+    def align(self, S):
+        left  = round(self.left  * S)
+        right = round(self.right * S)
+        upper = round(self.up    * S)
+        lower = round(self.down  * S)
+        return left, right, upper, lower
 
 def mask_inpaint(img):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -44,7 +44,7 @@ def mask_inpaint(img):
     mimg = cv2.inpaint(img, mask, 10, cv2.INPAINT_TELEA)
     return mimg        
         
-def preprocess(mp4_path, save_path, sq, rsize, startfr=300, endfr=None):
+def preprocess(mp4_path, save_path, rsize, startfr=300, endfr=None):
     '''
     ### parameters
     mp4_path: path of mp4 file \\
@@ -83,18 +83,14 @@ def preprocess(mp4_path, save_path, sq, rsize, startfr=300, endfr=None):
         size = np.array([det.width(), det.height()])
         ldmk = (ldmk - origin) / size         # restrained in [0, 0] ~ [1, 1]
         landmarks.append(ldmk)
-    
-        # clip the lower face image
-        ssq = sq.align(origin, size)
-        txtr = img[ssq.up:ssq.down, ssq.left:ssq.right]
         
+        # resize texture into a square
+        txtr = img[origin[1]:origin[1]+size[1], origin[0]:origin[0]+size[0]]
+        txtr = cv2.resize(txtr, (rsize, rsize))       
         # mask & inpaint for clothes region
         txtr = mask_inpaint(txtr)
-        
-        txtr = cv2.resize(txtr, (rsize, rsize))
-#        cv2.imwrite('tmp/'+str(cnt)+'_clip.png', txtr)
         textures.append(txtr)
-    
+        
     landmarks = np.array(landmarks)
     textures = np.array(textures)
     np.savez(save_path, landmarks=landmarks, textures=textures)
@@ -194,4 +190,4 @@ def test2():
         cv2.waitKey(0)    
     
 if __name__ == '__main__':
-    print('Hello, World')
+    preprocess('target/target001.mp4', 'target/target001.npz')

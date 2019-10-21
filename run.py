@@ -24,7 +24,7 @@ def combine(mp4_path, mp3_path):
     os.remove(mp4_path)
     return outp_path
 
-def lowerface(mp3_path, inp_path, tar_path, preproc=False, n=50, rsize=150, startfr=300, endfr=None):
+def lowerface(mp3_path, inp_path, tar_path, sq, preproc=False, n=50, rsize=300, startfr=300, endfr=None):
     # preprocess target video
     inp_dir, filename = os.path.split(inp_path)
     inp_id, _ = os.path.splitext(filename)
@@ -32,12 +32,18 @@ def lowerface(mp3_path, inp_path, tar_path, preproc=False, n=50, rsize=150, star
     tar_id, _ = os.path.splitext(filename)
     tmp_path = tar_dir+'/'+tar_id+'.npz'  
     if preproc or os.path.exists(tmp_path) == False:
-        sq = Square(0.2, 0.8, 0.40, 1.00)
-        preprocess(tar_path, tmp_path, sq, rsize, startfr, endfr)
+        preprocess(tar_path, tmp_path, rsize, startfr, endfr)
     
-    # load data    
+    # load target data  
     tgtdata = np.load(tmp_path)
     tgtS, tgtI = tgtdata['landmarks'], tgtdata['textures']
+    
+    # clip target textures
+    sq = Square(0.25, 0.75, 0.55, 1.00)
+    left, right, upper, lower = sq.align(tgtI.shape[1])
+    tgtI = tgtI[:, upper:lower, left:right, :]
+    
+    # load input data
     inpdata = np.load(inp_path)
     nfr = inpdata.shape[0]
     
@@ -46,7 +52,7 @@ def lowerface(mp3_path, inp_path, tar_path, preproc=False, n=50, rsize=150, star
     avi_path = outp_dir+inp_id+'-x-'+tar_id+'.avi'
     writer = cv2.VideoWriter(avi_path, cv2.VideoWriter_fourcc(*'DIVX'), fps, size)
     for cnt, inpS in enumerate(inpdata):
-        print("%04d/%04d" % (cnt, nfr))
+        print("%04d/%04d" % (cnt+1, nfr))
         outpI = weighted_median(inpS, tgtS, tgtI, n)
         
         frame = np.zeros((720, 1280, 3), dtype=np.uint8)
@@ -59,6 +65,7 @@ def lowerface(mp3_path, inp_path, tar_path, preproc=False, n=50, rsize=150, star
 if __name__ == '__main__':
     inp_id  = "test036"
     tar_id  = "target001"
+    sq = Square(0.25, 0.75, 0.55, 1.00)
     preproc = False
     n       = 50
     rsize   = 150
@@ -68,6 +75,6 @@ if __name__ == '__main__':
     mp3_path  = inp_dir + inp_id + ".mp3"
     inp_path  = inp_dir + inp_id + "_ldmks.npy"
     tar_path  = tar_dir + tar_id + ".mp4"
-    outp_path = lowerface(mp3_path, inp_path, tar_path, preproc, n, rsize, startfr, endfr)
+    outp_path = lowerface(mp3_path, inp_path, tar_path, sq, preproc, n, rsize, startfr, endfr)
     print('Lower face synthesized at path %s' % outp_path)
     
