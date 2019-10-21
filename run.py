@@ -21,7 +21,6 @@ def combine(mp4_path, mp3_path):
     outp_path = bdir + '/' + name + '.mp4'
     command = 'ffmpeg -i ' + mp4_path + ' -i ' + mp3_path + ' -c:v copy -c:a aac -strict experimental ' + outp_path
     call(command)
-    os.remove(mp4_path)
     return outp_path
 
 def lowerface(mp3_path, inp_path, tar_path, sq, preproc=False, n=50, rsize=300, startfr=300, endfr=None):
@@ -39,7 +38,6 @@ def lowerface(mp3_path, inp_path, tar_path, sq, preproc=False, n=50, rsize=300, 
     tgtS, tgtI = tgtdata['landmarks'], tgtdata['textures']
     
     # clip target textures
-    sq = Square(0.25, 0.75, 0.55, 1.00)
     left, right, upper, lower = sq.align(tgtI.shape[1])
     tgtI = tgtI[:, upper:lower, left:right, :]
     
@@ -54,21 +52,23 @@ def lowerface(mp3_path, inp_path, tar_path, sq, preproc=False, n=50, rsize=300, 
     for cnt, inpS in enumerate(inpdata):
         print("%04d/%04d" % (cnt+1, nfr))
         outpI = weighted_median(inpS, tgtS, tgtI, n)
+        H, W, _ = outpI.shape
         
         frame = np.zeros((720, 1280, 3), dtype=np.uint8)
         upper, left = (360, 560)
-        frame[upper:upper+rsize, left:left+rsize, :] = outpI
+        frame[upper:upper+H, left:left+W, :] = outpI
         writer.write(frame)
         
-    return combine(avi_path, mp3_path)
+    outp_path = combine(avi_path, mp3_path)
+    return outp_path
 
 if __name__ == '__main__':
     inp_id  = "test036"
     tar_id  = "target001"
-    sq = Square(0.25, 0.75, 0.55, 1.00)
+    sq = Square(0.25, 0.75, 0.6, 1.00)
     preproc = False
     n       = 50
-    rsize   = 150
+    rsize   = 300
     startfr = 300
     endfr   = None
     
