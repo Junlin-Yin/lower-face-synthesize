@@ -51,7 +51,7 @@ def lowerface(mp3_path, inp_path, tar_path, sq, preproc=False, n=50, rsize=300, 
     writer = cv2.VideoWriter(avi_path, cv2.VideoWriter_fourcc(*'DIVX'), fps, size)
     for cnt, inpS in enumerate(inpdata):
         print("%04d/%04d" % (cnt+1, nfr))
-        outpI = weighted_median(inpS, tgtS, tgtI, n)
+        outpI, outpS = weighted_median(inpS, tgtS, tgtI, n)
         H, W, _ = outpI.shape
         
         frame = np.zeros((720, 1280, 3), dtype=np.uint8)

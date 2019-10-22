@@ -21,6 +21,13 @@ black_lower = np.array([0, 0, 0])
 black_upper = np.array([180, 255, 46])
 white_lower = np.array([0, 0, 46])
 white_upper = np.array([180, 50, 255])
+teeth_lower = np.array([0, 0, 200])
+teeth_upper = np.array([180, 50, 255])
+
+leftidxlist  = np.array([0, 12])
+rightidxlist = np.array([6, 16])
+upperidxlist = np.array([0, 6, 12, 13, 14, 15, 16])
+loweridxlist = np.array([0, 6, 12, 16, 17, 18, 19])
 
 class Square:
     def __init__(self, l, r, u, d):
@@ -131,10 +138,16 @@ def locate_median(weights):
     return i
 
 def weighted_median(inpS, tgtS, tgtI, n, alpha=0.9):
+    # choose n candidates
     L2 = np.linalg.norm(tgtS-inpS, ord=2, axis=(1, 2))
     weights, indices = optimize_sigma(L2, n, alpha)
     candI = tgtI[indices, :, :, :]
+    candS = tgtS[indices, :, :]
     
+    # calculate weighted-average of landmarks for teeth enhancement
+    outpS = np.sum([l*w for l, w in zip(candS, weights)], axis=0)
+    
+    # form output texture
     outpI = np.zeros(tgtI.shape[1:], dtype=np.uint8)
     for y in range(outpI.shape[0]):
         for x in range(outpI.shape[1]):
@@ -146,9 +159,11 @@ def weighted_median(inpS, tgtS, tgtI, n, alpha=0.9):
                 weights_sort = weights[indices]
                 idx = locate_median(weights_sort)
                 outpI[y, x, c] = intencity[indices[idx]]
-    return outpI          
+    
+    return outpI, outpS  
 
 def teeth_proxy():  
+    # select and generate teeth proxy frame(s)
     startfr = 78 * 30
     rsize   = 300
     tar_path = 'target/target001.mp4'
@@ -171,8 +186,42 @@ def teeth_proxy():
     cv2.imshow('', txtr)
     cv2.waitKey(0)
     cv2.imwrite('reference/proxy_lower.png', txtr)
+
+def teeth_region(inpI, inpS, rsize, boundary):
+    # automatically detect upper and lower teeth region in input image
+    # boundary: (left, right, upper, lower)
+    cv2.imshow('raw',  inpI)
+    cv2.waitKey(0)
     
-def teeth_enhancement(img, pxy1, pxy2):
+    hsv = cv2.cvtColor(inpI, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(hsv, teeth_lower, teeth_upper)
+    xs, ys = mask.nonzero()
+    region = np.array([[x, y] for x, y in zip(xs, ys)])
+    if region.shape == (0,):
+        raise Exception("No teeth region found!")
+    
+    # eliminate region which is out of lip 
+    left  = np.min(inpS[leftidxlist,  0])
+    right = np.max(inpS[rightidxlist, 0])
+    upper = np.min(inpS[upperidxlist, 1])
+    lower = np.max(inpS[loweridxlist, 1])
+    
+    left  = round((left  - boundary[0]) * rsize)
+    right = round((right - boundary[0]) * rsize)
+    upper = round((upper - boundary[2]) * rsize)
+    lower = round((lower - boundary[2]) * rsize)
+
+    check = np.logical_and(
+            np.logical_and(region[:, 0] >= left,  region[:, 0] <= right),
+            np.logical_and(region[:, 1] >= upper, region[:, 1] <= lower))
+    region = region[check.nonzero()]
+    
+    cv2.imshow('mask', mask)
+    cv2.waitKey(0)
+    print(region.shape)
+    return region
+    
+def teeth_enhancement(inpI, inpS, pxyU, pxyL):
     pass
 
 def test1():
@@ -186,9 +235,9 @@ def test1():
     inp_id = "test036_ldmks"
     ldmks = np.load(inp_dir+inp_id+'.npy')
     ldmk_test = ldmks[160, :, :]    # the 100th frame
-    outp = weighted_median(ldmk_test, landmarks, textures, n=50)
+    outpI, outpS = weighted_median(ldmk_test, landmarks, textures, n=50)
     
-    cv2.imshow('title', outp)
+    cv2.imshow('title', outpI)
     cv2.waitKey(0)
     
 def test2():
@@ -214,4 +263,19 @@ def test2():
         cv2.waitKey(0)    
     
 if __name__ == '__main__':
-    print('Hello, World!')
+    # load target data  
+    tgtdata = np.load('target/target001.npz')
+    tgtS, tgtI = tgtdata['landmarks'], tgtdata['textures']
+    
+    # clip target textures
+    sq = Square(0.25, 0.75, 0.6, 1.00)
+    left, right, upper, lower = sq.align(tgtI.shape[1])
+    tgtI = tgtI[:, upper:lower, left:right, :]
+    
+    # load input data
+    inpdata = np.load('input/test036_ldmks.npy')
+    
+    # create every frame and form a mp4
+    for cnt, inpS in enumerate(inpdata):
+        outpI, outpS = weighted_median(inpS, tgtS, tgtI, 50)
+        region = teeth_region(outpI, outpS, 300, (left, right, upper, lower))
