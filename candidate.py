@@ -146,9 +146,33 @@ def weighted_median(inpS, tgtS, tgtI, n, alpha=0.9):
                 weights_sort = weights[indices]
                 idx = locate_median(weights_sort)
                 outpI[y, x, c] = intencity[indices[idx]]
-    return outpI            
+    return outpI          
 
-def teeth_proxy(img, pxy1, pxy2):
+def teeth_proxy():  
+    startfr = 78 * 30
+    rsize   = 300
+    tar_path = 'target/target001.mp4'
+    cap = cv2.VideoCapture(tar_path)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, startfr)
+    while True:
+        ret, img = cap.read()
+        cv2.imshow('', img)
+        cv2.waitKey(0)
+        a = input('Frame %04d: OK?(y/n)' % startfr)
+        if a == 'y':
+            break
+        startfr += 1
+
+    det = detector(img, 1)[0]
+    origin = np.array([det.left(), det.top()])
+    size = np.array([det.width(), det.height()])
+    txtr = img[origin[1]:origin[1]+size[1], origin[0]:origin[0]+size[0]]
+    txtr = cv2.resize(txtr, (rsize, rsize))
+    cv2.imshow('', txtr)
+    cv2.waitKey(0)
+    cv2.imwrite('reference/proxy_lower.png', txtr)
+    
+def teeth_enhancement(img, pxy1, pxy2):
     pass
 
 def test1():
@@ -190,4 +214,4 @@ def test2():
         cv2.waitKey(0)    
     
 if __name__ == '__main__':
-    preprocess('target/target001.mp4', 'target/target001.npz')
+    print('Hello, World!')
