@@ -6,42 +6,14 @@ This is a temporary script file.
 """
 import numpy as np 
 import cv2
-import dlib
+from __init__ import detector, predictor
+from __init__ import inp_dir
 from facefrontal import facefrontal
-
-tar_dir = 'target/'
-inp_dir = 'input/'
-outp_dir= 'output/'
-
-pdctdir = 'reference/shape_predictor_68_face_landmarks.dat'
-detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor(pdctdir)
 
 black_lower = np.array([0, 0, 0])
 black_upper = np.array([180, 255, 46])
 white_lower = np.array([0, 0, 46])
 white_upper = np.array([180, 50, 255])
-teeth_lower = np.array([0, 0, 200])
-teeth_upper = np.array([180, 50, 255])
-
-leftidxlist  = np.array([0, 12])
-rightidxlist = np.array([6, 16])
-upperidxlist = np.array([0, 6, 12, 13, 14, 15, 16])
-loweridxlist = np.array([0, 6, 12, 16, 17, 18, 19])
-
-class Square:
-    def __init__(self, l, r, u, d):
-        self.left = l
-        self.right = r
-        self.up = u
-        self.down = d
-        
-    def align(self, S):
-        left  = round(self.left  * S)
-        right = round(self.right * S)
-        upper = round(self.up    * S)
-        lower = round(self.down  * S)
-        return left, right, upper, lower
 
 def mask_inpaint(img):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -162,68 +134,6 @@ def weighted_median(inpS, tgtS, tgtI, n, alpha=0.9):
     
     return outpI, outpS  
 
-def teeth_proxy():  
-    # select and generate teeth proxy frame(s)
-    startfr = 78 * 30
-    rsize   = 300
-    tar_path = 'target/target001.mp4'
-    cap = cv2.VideoCapture(tar_path)
-    cap.set(cv2.CAP_PROP_POS_FRAMES, startfr)
-    while True:
-        ret, img = cap.read()
-        cv2.imshow('', img)
-        cv2.waitKey(0)
-        a = input('Frame %04d: OK?(y/n)' % startfr)
-        if a == 'y':
-            break
-        startfr += 1
-
-    det = detector(img, 1)[0]
-    origin = np.array([det.left(), det.top()])
-    size = np.array([det.width(), det.height()])
-    txtr = img[origin[1]:origin[1]+size[1], origin[0]:origin[0]+size[0]]
-    txtr = cv2.resize(txtr, (rsize, rsize))
-    cv2.imshow('', txtr)
-    cv2.waitKey(0)
-    cv2.imwrite('reference/proxy_lower.png', txtr)
-
-def teeth_region(inpI, inpS, rsize, boundary):
-    # automatically detect upper and lower teeth region in input image
-    # boundary: (left, right, upper, lower)
-    cv2.imshow('raw',  inpI)
-    cv2.waitKey(0)
-    
-    hsv = cv2.cvtColor(inpI, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, teeth_lower, teeth_upper)
-    xs, ys = mask.nonzero()
-    region = np.array([[x, y] for x, y in zip(xs, ys)])
-    if region.shape == (0,):
-        raise Exception("No teeth region found!")
-    
-    # eliminate region which is out of lip 
-    left  = np.min(inpS[leftidxlist,  0])
-    right = np.max(inpS[rightidxlist, 0])
-    upper = np.min(inpS[upperidxlist, 1])
-    lower = np.max(inpS[loweridxlist, 1])
-    
-    left  = round((left  - boundary[0]) * rsize)
-    right = round((right - boundary[0]) * rsize)
-    upper = round((upper - boundary[2]) * rsize)
-    lower = round((lower - boundary[2]) * rsize)
-
-    check = np.logical_and(
-            np.logical_and(region[:, 0] >= left,  region[:, 0] <= right),
-            np.logical_and(region[:, 1] >= upper, region[:, 1] <= lower))
-    region = region[check.nonzero()]
-    
-    cv2.imshow('mask', mask)
-    cv2.waitKey(0)
-    print(region.shape)
-    return region
-    
-def teeth_enhancement(inpI, inpS, pxyU, pxyL):
-    pass
-
 def test1():
 #    tar_id = "target001"
 #    savepath = preprocess(tar_dir+tar_id+'.mp4', sq, rsize=150, startfr=300)
@@ -263,19 +173,4 @@ def test2():
         cv2.waitKey(0)    
     
 if __name__ == '__main__':
-    # load target data  
-    tgtdata = np.load('target/target001.npz')
-    tgtS, tgtI = tgtdata['landmarks'], tgtdata['textures']
-    
-    # clip target textures
-    sq = Square(0.25, 0.75, 0.6, 1.00)
-    left, right, upper, lower = sq.align(tgtI.shape[1])
-    tgtI = tgtI[:, upper:lower, left:right, :]
-    
-    # load input data
-    inpdata = np.load('input/test036_ldmks.npy')
-    
-    # create every frame and form a mp4
-    for cnt, inpS in enumerate(inpdata):
-        outpI, outpS = weighted_median(inpS, tgtS, tgtI, 50)
-        region = teeth_region(outpI, outpS, 300, (left, right, upper, lower))
+    print('Hello, World!')

@@ -9,8 +9,8 @@ import os
 import cv2
 import numpy as np
 from subprocess import call
-from candidate import inp_dir, tar_dir, outp_dir
-from candidate import Square, preprocess, weighted_median
+from __init__ import inp_dir, tar_dir, outp_dir, Square
+from candidate import preprocess, weighted_median
 
 fps = 30
 size = (1280, 720)
@@ -38,8 +38,8 @@ def lowerface(mp3_path, inp_path, tar_path, sq, preproc=False, n=50, rsize=300, 
     tgtS, tgtI = tgtdata['landmarks'], tgtdata['textures']
     
     # clip target textures
-    left, right, upper, lower = sq.align(tgtI.shape[1])
-    tgtI = tgtI[:, upper:lower, left:right, :]
+    boundary = sq.align(tgtI.shape[1])      # (left, right, upper, lower)
+    tgtI = tgtI[:, boundary[2]:boundary[3], boundary[0]:boundary[1], :]
     
     # load input data
     inpdata = np.load(inp_path)
