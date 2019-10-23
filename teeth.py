@@ -29,7 +29,7 @@ def select_proxy():
         ret, img = cap.read()
         cv2.imwrite('reference/proxy_%s_%04d.png' % (tag, fr), img)
         
-def process_proxy(mode, rsize=300, ksize=(7, 7), sigma=1, k=0.5):
+def process_proxy(mode, rsize=300, ksize=(7, 7), sigma=1, k=2):
     # process teeth proxies to get their landmarks and high-pass filters
     assert(mode == 'upper' or mode == 'lower')
     pxyfile = glob.glob('reference/proxy_%s_*.png' % mode)[0]
@@ -111,7 +111,7 @@ def teeth_enhancement(inpI, inpS, pxyF, pxyS, region, rsize, boundary, mode):
     # calculate displacement between input image and proxy
     inpS_half = inpS[upperlipidx, :] if mode == 'upper' else inpS[lowerlipidx, :]
     pxyS_half = pxyS[upperlipidx, :] if mode == 'upper' else pxyS[lowerlipidx, :]
-    dx, dy = np.round(np.mean(inpS_half - pxyS_half, axis=0) * rsize)
+    dx, dy = np.round(np.mean(inpS_half - pxyS_half, axis=0) * rsize).astype(np.int)
     
     outpI = np.copy(inpI)
     x_bd, y_bd = boundary[0], boundary[2]
@@ -124,8 +124,13 @@ def teeth_enhancement(inpI, inpS, pxyF, pxyS, region, rsize, boundary, mode):
             if pxyF[y_pxy, x_pxy, c] < 0.5:
                 outpI[y_pt, x_pt, c] *= 2 * pxyF[y_pxy, x_pxy, c]
             else:
-                outpI[y_pt, x_pt, c] = 1 - 2*(1-outpI[y_pt, x_pt, c])*(1-pxyF[y_pxy, x_pxy, c])
+                outpI[y_pt, x_pt, c] = 255 - 2*(255-outpI[y_pt, x_pt, c])*(1-pxyF[y_pxy, x_pxy, c])
     
+    return outpI
+
+def sharpen(inpI, ksize=(7, 7), sigma=1, k=0.5):
+    smooth_inpI = cv2.GaussianBlur(inpI, ksize, sigma)
+    outpI = (inpI - smooth_inpI)*k + inpI
     return outpI
 
 def test1():
@@ -140,7 +145,7 @@ def test1():
     tgtI = tgtI[:, boundary[2]:boundary[3], boundary[0]:boundary[1], :]
     
     # load input data
-    inpdata = np.load('input/test036_ldmks.npy')
+    inpdata = np.load('input/test036_ldmks.npy')[20:]
     
     # load proxy landmarks and filters
     pxySU, pxyFU = process_proxy('upper')
@@ -148,22 +153,21 @@ def test1():
     
     # create every frame and form a mp4
     for cnt, inpS in enumerate(inpdata):
-        outpI, outpS = weighted_median(inpS, tgtS, tgtI, 50)
+        tmpI, tmpS = weighted_median(inpS, tgtS, tgtI, 50)        
+        regionU, regionL = detect_region(tmpI, tmpS, 300, boundary)
         
-        cv2.imshow('raw', outpI)
-        cv2.waitKey(0)
-        
-        regionU, regionL = detect_region(outpI, outpS, 300, boundary)
+        outpI, outpS = np.copy(tmpI), np.copy(tmpS)
         for mode in ('upper', 'lower'):
             pxyS = pxySU if mode == 'upper' else pxySL
             pxyF = pxyFU if mode == 'upper' else pxyFL
             region = regionU if mode == 'upper' else regionL
             outpI = teeth_enhancement(outpI, outpS, pxyF, pxyS, region, 300, boundary, mode)
-        
+
+        cv2.imshow('raw', tmpI)        
         cv2.imshow('enhance', outpI)
         cv2.waitKey(0)
+        diffI = outpI - tmpI
+        print(np.sum(diffI != 0))
     
 if __name__ == '__main__':
-    S, F = process_proxy('upper')
-    S, F = process_proxy('lower')
-    print('Done')
+    test1()
