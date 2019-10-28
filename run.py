@@ -70,7 +70,7 @@ if __name__ == '__main__':
     n       = 50
     rsize   = 300
     startfr = 300
-    endfr   = None
+    endfr   = 4820
     
     mp3_path  = inp_dir + inp_id + ".mp3"
     inp_path  = inp_dir + inp_id + "_ldmks.npy"

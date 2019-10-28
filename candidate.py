@@ -10,6 +10,12 @@ from __init__ import detector, predictor
 from __init__ import inp_dir
 from facefrontal import facefrontal
 
+k = 1.8
+data = np.load('reference/ldmk_stat.npz')
+mean, std = data['mean'], data['std']
+boundL = mean - k*std
+boundU = mean + k*std
+
 black_lower = np.array([0, 0, 0])
 black_upper = np.array([180, 255, 46])
 white_lower = np.array([0, 0, 46])
@@ -61,7 +67,10 @@ def preprocess(mp4_path, save_path, rsize, startfr=300, endfr=None):
         origin = np.array([det.left(), det.top()])
         size = np.array([det.width(), det.height()])
         ldmk = (ldmk - origin) / size         # restrained in [0, 0] ~ [1, 1]
-        landmarks.append(ldmk)
+        # validate landmarks using statistics in the dataset
+        if np.sum(np.logical_or(ldmk < boundL, ldmk > boundU)) > 0:
+            continue        
+        landmarks.append(ldmk.flatten())
         
         # resize texture into a square
         txtr = img[origin[1]:origin[1]+size[1], origin[0]:origin[0]+size[0]]
@@ -72,6 +81,14 @@ def preprocess(mp4_path, save_path, rsize, startfr=300, endfr=None):
         
     landmarks = np.array(landmarks)
     textures = np.array(textures)
+    
+    # filter frames which are not locally smooth
+    approx = (landmarks[2:, :] + landmarks[:-2, :]) / 2
+    L2 = np.linalg.norm(landmarks[1:-1, :]-approx, ord=2, axis=1)
+    check = (L2 <= 0.1).nonzero()
+    landmarks = landmarks[1:-1][check].reshape((-1, 20, 2))
+    textures  = textures[1:-1][check]
+    
     np.savez(save_path, landmarks=landmarks, textures=textures)
 
 def optimize_sigma(L2, n, alpha):
@@ -173,4 +190,5 @@ def test2():
         cv2.waitKey(0)    
     
 if __name__ == '__main__':
-    print('Hello, World!')
+    test1()
+    

@@ -5,16 +5,18 @@ import glob
 import numpy as np
 from __init__ import detector, predictor, Square
 
-teeth_lower = np.array([0, 0, 80])
-teeth_upper = np.array([180, 120, 255])
+teeth_lower  = np.array([0, 0, 75])
+teeth_upper  = np.array([180, 120, 255])
+adjust_lower = np.array([0, 0, 30])
+adjust_upper = np.array([176, 120, 255])
 
 leftmostidx  = np.array([0, 12])
 rightmostidx = np.array([6, 16])
 uppermostidx = np.array([0, 6, 12, 13, 14, 15, 16])
 lowermostidx = np.array([0, 6, 12, 16, 17, 18, 19])
 
-upperlipidx  = np.array([0, 1, 2, 3, 4, 5, 6, 12, 13, 14, 15, 16])
-lowerlipidx  = np.array([0, 6, 7, 8, 9, 10, 11, 12, 16, 17, 18, 19])
+upperlipidx  = np.array([1, 2, 3, 4, 5, 13, 14, 15])
+lowerlipidx  = np.array([7, 8, 9, 10, 11, 17, 18, 19])
 
 def select_proxy():  
     # select and generate teeth proxy frame(s)
@@ -29,7 +31,7 @@ def select_proxy():
         ret, img = cap.read()
         cv2.imwrite('reference/proxy_%s_%04d.png' % (tag, fr), img)
         
-def process_proxy(mode, rsize=300, ksize=(7, 7), sigma=1, k=2):
+def process_proxy(mode, rsize=300, ksize=(7, 7), sigma=1, k=10):
     # process teeth proxies to get their landmarks and high-pass filters
     assert(mode == 'upper' or mode == 'lower')
     pxyfile = glob.glob('reference/proxy_%s_*.png' % mode)[0]
@@ -58,11 +60,10 @@ def process_proxy(mode, rsize=300, ksize=(7, 7), sigma=1, k=2):
     
     return ldmk, filt
 
-def detect_region(inpI, inpS, rsize, boundary):
-    # automatically detect upper and lower teeth region in input image
-    # boundary: (left, right, upper, lower)
+def get_mask(inpI, inpS, thresholdL, thresholdU, rsize, boundary):
+    # convert to HSV space and use mthreshold set manually
     hsv = cv2.cvtColor(inpI, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, teeth_lower, teeth_upper)
+    mask = cv2.inRange(hsv, thresholdL, thresholdU)
     
     # eliminate region that is out of mouth
     alpha = 0.05
@@ -79,13 +80,24 @@ def detect_region(inpI, inpS, rsize, boundary):
     mask[:, :left]  = 0
     mask[:, right:] = 0   
     mask[:upper, :] = 0
-    mask[lower:, :] = 0
+    mask[lower:, :] = 0  
+    
+    return mask
 
-#    cv2.imshow('raw',  inpI)    
-#    for i in range(inpI.shape[2]):
-#        inpI[:, :, i] &= mask
-#    cv2.imshow('mask', inpI)
-#    cv2.waitKey(0)
+def show_mask(img, mask):
+    img_ = np.copy(img)  
+    for i in range(img_.shape[2]):
+        img_[:, :, i] &= mask
+    cv2.imshow('raw',  img)  
+    cv2.imshow('masked', img_)
+    cv2.waitKey(0) 
+
+def detect_region(inpI, inpS, rsize, boundary):
+    # automatically detect upper and lower teeth region in input image
+    # boundary: (left, right, upper, lower)
+
+    mask = get_mask(inpI, inpS, teeth_lower, teeth_upper, rsize, boundary) 
+#    show_mask(inpI, mask)
     
     # get teeth region
     ys, xs = mask.nonzero()
@@ -122,7 +134,7 @@ def teeth_enhancement(inpI, inpS, pxyF, pxyS, region, rsize, boundary, mode):
             x_pxy = x_bd + x_pt - dx
             y_pxy = y_bd + y_pt - dy
             if pxyF[y_pxy, x_pxy, c] < 0.5:
-                outpI[y_pt, x_pt, c] *= 2 * pxyF[y_pxy, x_pxy, c]
+                outpI[y_pt, x_pt, c] *= 2*pxyF[y_pxy, x_pxy, c]
             else:
                 outpI[y_pt, x_pt, c] = 255 - 2*(255-outpI[y_pt, x_pt, c])*(1-pxyF[y_pxy, x_pxy, c])
     
@@ -145,7 +157,7 @@ def test1():
     tgtI = tgtI[:, boundary[2]:boundary[3], boundary[0]:boundary[1], :]
     
     # load input data
-    inpdata = np.load('input/test036_ldmks.npy')[20:]
+    inpdata = np.load('input/test036_ldmks.npy')[22:]
     
     # load proxy landmarks and filters
     pxySU, pxyFU = process_proxy('upper')
@@ -153,6 +165,7 @@ def test1():
     
     # create every frame and form a mp4
     for cnt, inpS in enumerate(inpdata):
+        print(cnt)
         tmpI, tmpS = weighted_median(inpS, tgtS, tgtI, 50)        
         regionU, regionL = detect_region(tmpI, tmpS, 300, boundary)
         
@@ -163,11 +176,27 @@ def test1():
             region = regionU if mode == 'upper' else regionL
             outpI = teeth_enhancement(outpI, outpS, pxyF, pxyS, region, 300, boundary, mode)
 
+#        mask = get_mask(outpI, outpS, adjust_lower, adjust_upper, 300, boundary)
+#        show_mask(outpI, mask)
+#        for c in range(outpI.shape[2]):
+#            outpI[:,:,c] |= mask
         cv2.imshow('raw', tmpI)        
         cv2.imshow('enhance', outpI)
         cv2.waitKey(0)
-        diffI = outpI - tmpI
-        print(np.sum(diffI != 0))
+
+def test2():
+    # load proxy landmarks and filters
+    _, pxyFU = process_proxy('upper')
+    _, pxyFL = process_proxy('lower')
+    maskU = (pxyFU > 0.5).astype(np.uint8)
+    maskU[maskU != 0] = 255
+    maskL = (pxyFL > 0.5).astype(np.uint8)
+    maskL[maskL != 0] = 255
+    cv2.imshow('Upper', maskU)
+    cv2.imshow('Lower', maskL)
+    cv2.waitKey(0)
+    cv2.imwrite('FilterUpper.png', maskU)
+    cv2.imwrite('FilterLower.png', maskL)
     
 if __name__ == '__main__':
-    test1()
+    test2()
