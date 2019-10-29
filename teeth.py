@@ -75,7 +75,7 @@ def process_proxy(thresholdU, thresholdL, biasU, biasL, rsize=300, ksize=(7, 7),
         
     return F, S
 
-def detect_region(inpI, inpS, rsize, boundary, alpha=15, betaU=5, betaL=3):
+def detect_region(inpI, inpS, rsize, boundary, alpha, betaU, betaL):
     # automatically detect upper and lower teeth region in input image
     # boundary: (left, right, upper, lower)
     upper_xp = inpS[uppermostidx][:, 0] * rsize - boundary[0]
@@ -93,14 +93,15 @@ def detect_region(inpI, inpS, rsize, boundary, alpha=15, betaU=5, betaL=3):
         upper_region, lower_region = np.array([]), np.array([])
     else:
         # divide region into upper and lower ones
-        axis = (np.max(region[:, 0]) + np.min(region[:, 0])) / 2
+        lmda = 0.6
+        axis = lmda*np.max(region[:, 0]) + (1-lmda)*np.min(region[:, 0])
         check = region[:, 0] <= axis
         upper_region = region[check.nonzero()]
         lower_region = region[np.logical_not(check).nonzero()]
         
     return upper_region, lower_region
     
-def local_enhancement(inpI, inpS, pxyF, pxyS, region, rsize, boundary, mode):
+def local_enhancement(inpI, inpS, pxyF, pxyS, region, rsize, boundary, mode, dis):
     # enhance quality of input image given teeth proxy filter and their landmarks
     # region is the part which is to be enhanced
     assert(mode == 'upper' or mode == 'lower')
@@ -115,11 +116,11 @@ def local_enhancement(inpI, inpS, pxyF, pxyS, region, rsize, boundary, mode):
     for (y_pt, x_pt) in region:
         # (x_pxy, y_pxy) in proxy -> (x_pt, y_pt) in input image
         x_pxy = x_bd + x_pt - dx
-        y_pxy = y_bd + y_pt - dy
+        y_pxy = y_bd + y_pt - dy + dis
         if pxyF[y_pxy, x_pxy] < 0.5:
-            outpI[y_pt, x_pt] = np.min(2*pxyF[y_pxy, x_pxy] * outpI[y_pt, x_pt])
+            outpI[y_pt, x_pt] = np.mean(2*pxyF[y_pxy, x_pxy] * outpI[y_pt, x_pt])
         else:
-            outpI[y_pt, x_pt] = np.max(255 - 2*(255-outpI[y_pt, x_pt])*(1-pxyF[y_pxy, x_pxy]))
+            outpI[y_pt, x_pt] = np.mean(255 - 2*(255-outpI[y_pt, x_pt])*(1-pxyF[y_pxy, x_pxy]))
     return outpI
 
 def sharpen(inpI, ksize=(7, 7), sigma=1, k=0.5):
@@ -127,54 +128,37 @@ def sharpen(inpI, ksize=(7, 7), sigma=1, k=0.5):
     outpI = (inpI - smooth_inpI)*k + inpI
     return outpI
 
-def process_teeth(inpI, inpS, pxyF, pxyS, rsize, boundary, alpha=15):
-    regionU, regionL = detect_region(inpI, inpS, rsize, boundary, alpha)
+def process_teeth(inpI, inpS, pxyF, pxyS, rsize, boundary, alpha=14, betaU=3, betaL=5, dissU=-1, dissL=0):
+    regionU, regionL = detect_region(inpI, inpS, rsize, boundary, alpha, betaU, betaL)
     # enhance upper region
-    tmpI  = local_enhancement(inpI, inpS, pxyF['upper'], pxyS['upper'], regionU, rsize, boundary, 'upper')
+    tmpI  = local_enhancement(inpI, inpS, pxyF['upper'], pxyS['upper'], regionU, rsize, boundary, 'upper', dissU)
     # enhance lower region
-    outpI = local_enhancement(tmpI, inpS, pxyF['lower'], pxyS['lower'], regionL, rsize, boundary, 'lower')
+    outpI = local_enhancement(tmpI, inpS, pxyF['lower'], pxyS['lower'], regionL, rsize, boundary, 'lower', dissL)
     
     return outpI 
 
 def test1():
     from candidate import weighted_median
-    # load target data  
+    sq = Square(0.25, 0.75, 0.6, 1.00)
     tgtdata = np.load('target/target001.npz')
     tgtS, tgtI = tgtdata['landmarks'], tgtdata['textures']
-    
-    # clip target textures
-    sq = Square(0.25, 0.75, 0.6, 1.00)
     boundary = sq.align(tgtI.shape[1])      # (left, right, upper, lower)
     tgtI = tgtI[:, boundary[2]:boundary[3], boundary[0]:boundary[1], :]
-    
-    # load input data
-    inpdata = np.load('input/test036_ldmks.npy')[20:]
-    
-    # load proxy landmarks and filters
-    pxySU, pxyFU = process_proxy('upper', threshold=226, bias=0.005)
-    pxySL, pxyFL = process_proxy('lower', threshold=238, bias=0.003)
-    
-    # create every frame and form a mp4
+    inpdata = np.load('input/test036_ldmks.npy')
+    nfr = inpdata.shape[0]
+    pxyF, pxyS = process_proxy(213, 235, 0.005, 0.003, 300)
     for cnt, inpS in enumerate(inpdata):
-        print(cnt)
-        tmpI, tmpS = weighted_median(inpS, tgtS, tgtI, 50)        
-        regionU, regionL = detect_region(tmpI, tmpS, 300, boundary, alpha=15)
-        
-        outpI, outpS = np.copy(tmpI), np.copy(tmpS)
-        for mode in ('upper', 'lower'):
-            pxyS = pxySU if mode == 'upper' else pxySL
-            pxyF = pxyFU if mode == 'upper' else pxyFL
-            region = regionU if mode == 'upper' else regionL
-            outpI = local_enhancement(outpI, outpS, pxyF, pxyS, region, 300, boundary, mode)
-
-        cv2.imshow('raw', tmpI)     
+        print("%04d/%04d" % (cnt+1, nfr))
+        tmpI, tmpS = weighted_median(inpS, tgtS, tgtI, 50)
+        outpI = process_teeth(tmpI, tmpS, pxyF, pxyS, 300, boundary)
+        cv2.imshow('raw', tmpI)
         cv2.imshow('enhance', outpI)
         cv2.waitKey(0)
 
 def test2():
     # load proxy landmarks and filters
-    _, pxyFU = process_proxy('upper', 230, 0.005)
-    _, pxyFL = process_proxy('lower', 230, 0.003)
+    pxyF, _ = process_proxy(213, 235, 0.005, 0.003, rsize=300)
+    pxyFU, pxyFL = pxyF['upper'], pxyF['lower']
     maskU = (pxyFU > 0.5).astype(np.uint8)
     maskU[maskU != 0] = 255
     maskL = (pxyFL > 0.5).astype(np.uint8)
@@ -182,14 +166,14 @@ def test2():
     cv2.imshow('Upper', maskU)
     cv2.imshow('Lower', maskL)
     cv2.waitKey(0)
-#    cv2.imwrite('FilterUpper.png', maskU)
-#    cv2.imwrite('FilterLower.png', maskL)
+    cv2.imwrite('reference/FilterUpper.png', maskU)
+    cv2.imwrite('reference/FilterLower.png', maskL)
     
 def test3():
     tar_path = 'target/target001.mp4'
-    fr = 530
-    mode = 'lower'
+    fr = 3261
+    mode = 'upper'
     select_proxy(tar_path, mode, fr)    
     
 if __name__ == '__main__':
-    test1()
+    test2()

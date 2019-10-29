@@ -9,7 +9,7 @@ mean, std = data['mean'], data['std']
 boundL = mean - k*std
 boundU = mean + k*std
 
-def util1(mp4_path, startfr=530, endfr=None):
+def util1(mp4_path, startfr=3235, endfr=None):
     # eliminate frames spoiled by facefrontal()
     cap = cv2.VideoCapture(mp4_path)
     cap.set(cv2.CAP_PROP_POS_FRAMES, startfr)

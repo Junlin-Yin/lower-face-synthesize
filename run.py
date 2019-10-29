@@ -49,7 +49,7 @@ def lowerface(mp3_path, inp_path, tar_path, sq, preproc=False, n=50, rsize=300, 
     nfr = inpdata.shape[0]
     
     # load proxy landmarks and filters
-    pxyF, pxyS = process_proxy(229, 238, 0.005, 0.003, rsize=rsize)
+    pxyF, pxyS = process_proxy(213, 235, 0.005, 0.003, rsize=rsize)
     
     # create every frame and form a mp4
     print('Start to create new video...')
@@ -58,7 +58,7 @@ def lowerface(mp3_path, inp_path, tar_path, sq, preproc=False, n=50, rsize=300, 
     for cnt, inpS in enumerate(inpdata):
         print("%04d/%04d" % (cnt+1, nfr))
         tmpI, tmpS = weighted_median(inpS, tgtS, tgtI, n)
-        outpI = process_teeth(tmpI, tmpS, pxyF, pxyS, rsize, boundary, alpha=15)
+        outpI = process_teeth(tmpI, tmpS, pxyF, pxyS, rsize, boundary)
         
 #        cv2.imshow('raw', tmpI)
 #        cv2.imshow('enhance', outpI)
