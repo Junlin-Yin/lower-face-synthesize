@@ -1,13 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import cv2
-import numpy as np
-
-k = 1.8
-data = np.load('reference/ldmk_stat.npz')
-mean, std = data['mean'], data['std']
-boundL = mean - k*std
-boundU = mean + k*std
 
 def util1(mp4_path, startfr=3235, endfr=None):
     # eliminate frames spoiled by facefrontal()
@@ -44,5 +37,6 @@ def util2(mp4_path, save_path, startfr=0, endfr=None):
     print('Done')
             
 if __name__ == '__main__':
-    mp4_path = 'target/target001.mp4'
-    util1(mp4_path)
+    mp4_path = 'C:/Users/xinzhu/Desktop/lower-face-synthesize/4teeth.mp4'
+    save_path = 'tmp/'
+    util2(mp4_path, save_path)

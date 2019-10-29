@@ -133,8 +133,10 @@ def process_teeth(inpI, inpS, pxyF, pxyS, rsize, boundary, alpha=14, betaU=3, be
     # enhance upper region
     tmpI  = local_enhancement(inpI, inpS, pxyF['upper'], pxyS['upper'], regionU, rsize, boundary, 'upper', dissU)
     # enhance lower region
-    outpI = local_enhancement(tmpI, inpS, pxyF['lower'], pxyS['lower'], regionL, rsize, boundary, 'lower', dissL)
-    
+    tmpI = local_enhancement(tmpI, inpS, pxyF['lower'], pxyS['lower'], regionL, rsize, boundary, 'lower', dissL)
+    # sharpening
+#    outpI = sharpen(tmpI, k=0.5)
+    outpI = tmpI
     return outpI 
 
 def test1():
@@ -173,7 +175,17 @@ def test3():
     tar_path = 'target/target001.mp4'
     fr = 3261
     mode = 'upper'
-    select_proxy(tar_path, mode, fr)    
+    select_proxy(tar_path, mode, fr)
+    
+def test4(k=0.5):
+    imgfiles = os.listdir('tmp/')
+    for f in imgfiles:
+        inpI = cv2.imread(f)
+        outpI = sharpen(inpI, k=k)
+        cv2.imshow('input', inpI)
+        cv2.imshow('output', outpI)
+        cv2.waitKey(0)
     
 if __name__ == '__main__':
-    test2()
+    k = 0.5
+    test4(k)
