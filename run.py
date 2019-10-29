@@ -11,6 +11,7 @@ import numpy as np
 from subprocess import call
 from __init__ import inp_dir, tar_dir, outp_dir, Square
 from candidate import preprocess, weighted_median
+from teeth import process_proxy, process_teeth
 
 fps = 30
 size = (1280, 720)
@@ -30,6 +31,8 @@ def lowerface(mp3_path, inp_path, tar_path, sq, preproc=False, n=50, rsize=300, 
     tar_dir, filename = os.path.split(tar_path)
     tar_id, _ = os.path.splitext(filename)
     tmp_path = tar_dir+'/'+tar_id+'.npz'  
+    
+    # preprocess
     if preproc or os.path.exists(tmp_path) == False:
         preprocess(tar_path, tmp_path, rsize, startfr, endfr)
     
@@ -45,15 +48,23 @@ def lowerface(mp3_path, inp_path, tar_path, sq, preproc=False, n=50, rsize=300, 
     inpdata = np.load(inp_path)
     nfr = inpdata.shape[0]
     
+    # load proxy landmarks and filters
+    pxyF, pxyS = process_proxy(229, 238, 0.005, 0.003, rsize=rsize)
+    
     # create every frame and form a mp4
     print('Start to create new video...')
     avi_path = outp_dir+inp_id+'-x-'+tar_id+'.avi'
     writer = cv2.VideoWriter(avi_path, cv2.VideoWriter_fourcc(*'DIVX'), fps, size)
     for cnt, inpS in enumerate(inpdata):
         print("%04d/%04d" % (cnt+1, nfr))
-        outpI, outpS = weighted_median(inpS, tgtS, tgtI, n)
-        H, W, _ = outpI.shape
+        tmpI, tmpS = weighted_median(inpS, tgtS, tgtI, n)
+        outpI = process_teeth(tmpI, tmpS, pxyF, pxyS, rsize, boundary, alpha=15)
         
+#        cv2.imshow('raw', tmpI)
+#        cv2.imshow('enhance', outpI)
+#        cv2.waitKey(0)
+ 
+        H, W, _ = outpI.shape
         frame = np.zeros((720, 1280, 3), dtype=np.uint8)
         upper, left = (360, 560)
         frame[upper:upper+H, left:left+W, :] = outpI
