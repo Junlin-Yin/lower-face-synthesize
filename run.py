@@ -24,7 +24,7 @@ def combine(mp4_path, mp3_path):
     call(command)
     return outp_path
 
-def lowerface(mp3_path, inp_path, tar_path, sq, preproc=False, n=50, rsize=300, startfr=300, endfr=None):
+def lowerface(sq, mp3_path, inp_path, tar_path, avi_path=None, preproc=False, startfr=0, endfr=None, n=100, ks=17, sigma=1e2, k=1):
     # preprocess target video
     inp_dir, filename = os.path.split(inp_path)
     inp_id, _ = os.path.splitext(filename)
@@ -49,20 +49,17 @@ def lowerface(mp3_path, inp_path, tar_path, sq, preproc=False, n=50, rsize=300, 
     nfr = inpdata.shape[0]
     
     # load proxy landmarks and filters
-    pxyF, pxyS = process_proxy(213, 235, 0.005, 0.003, rsize=rsize)
+#    pxyF, pxyS = process_proxy(213, 235, 0.005, 0.003, rsize=rsize)
+    pxyF, pxyS = process_proxy(thresholdU=213, thresholdL=235, rsize=300, ksize=(ks, ks), sigma=sigma, k=k)
     
     # create every frame and form a mp4
+    avi_path = '%s%s-x-%s.avi' % (outp_dir, inp_id, tar_id, ) if avi_path is None else avi_path
     print('Start to create new video...')
-    avi_path = outp_dir+inp_id+'-x-'+tar_id+'.avi'
     writer = cv2.VideoWriter(avi_path, cv2.VideoWriter_fourcc(*'DIVX'), fps, size)
     for cnt, inpS in enumerate(inpdata):
-        print("%04d/%04d" % (cnt+1, nfr))
+        print("%s: %04d/%04d" % (avi_path, cnt+1, nfr))
         tmpI, tmpS = weighted_median(inpS, tgtS, tgtI, n)
         outpI = process_teeth(tmpI, tmpS, pxyF, pxyS, rsize, boundary)
-        
-#        cv2.imshow('raw', tmpI)
-#        cv2.imshow('enhance', outpI)
-#        cv2.waitKey(0)
  
         H, W, _ = outpI.shape
         frame = np.zeros((720, 1280, 3), dtype=np.uint8)
@@ -78,14 +75,13 @@ if __name__ == '__main__':
     tar_id  = "target001"
     sq = Square(0.25, 0.75, 0.6, 1.00)
     preproc = False
-    n       = 50
     rsize   = 300
-    startfr = 300
-    endfr   = 4820
+    n       = 100
     
     mp3_path  = inp_dir + inp_id + ".mp3"
     inp_path  = inp_dir + inp_id + "_ldmks.npy"
     tar_path  = tar_dir + tar_id + ".mp4"
-    outp_path = lowerface(mp3_path, inp_path, tar_path, sq, preproc, n, rsize, startfr, endfr)
+    avi_path  = 'output/3final.avi'
+    outp_path = lowerface(sq, mp3_path, inp_path, tar_path, avi_path, preproc, n)
     print('Lower face synthesized at path %s' % outp_path)
     

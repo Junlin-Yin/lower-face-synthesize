@@ -37,6 +37,6 @@ def util2(mp4_path, save_path, startfr=0, endfr=None):
     print('Done')
             
 if __name__ == '__main__':
-    mp4_path = 'C:/Users/xinzhu/Desktop/lower-face-synthesize/4teeth.mp4'
+    mp4_path = 'C:/Users/xinzhu/Desktop/lower-face-synthesize/1prefilter.mp4'
     save_path = 'tmp/'
     util2(mp4_path, save_path)
