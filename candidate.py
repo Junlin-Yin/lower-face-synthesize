@@ -29,7 +29,7 @@ def mask_inpaint(img):
     mimg = cv2.inpaint(img, mask, 10, cv2.INPAINT_TELEA)
     return mimg        
         
-def preprocess(mp4_path, save_path, rsize, startfr=300, endfr=None):
+def preprocess(mp4_path, save_path, rsize, startfr=0, endfr=None):
     '''
     ### parameters
     mp4_path: path of mp4 file \\
@@ -126,7 +126,7 @@ def locate_median(weights):
             break
     return i
 
-def weighted_median(inpS, tgtS, tgtI, n, alpha=0.9):
+def weighted_median(inpS, tgtS, tgtI, n=100, alpha=0.9):
     # choose n candidates
     L2 = np.linalg.norm(tgtS-inpS, ord=2, axis=(1, 2))
     weights, indices = optimize_sigma(L2, n, alpha)

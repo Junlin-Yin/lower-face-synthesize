@@ -33,10 +33,11 @@ def util2(mp4_path, save_path, startfr=0, endfr=None):
         cnt += 1
         _, img = cap.read()
         img = img[360:360+120, 560:560+150]
-        cv2.imwrite('%s%04d.png' % (save_path, cnt-1), img)
+        cv2.imwrite('%s%04d_t1.png' % (save_path, cnt-1), img)
     print('Done')
             
 if __name__ == '__main__':
-    mp4_path = 'C:/Users/xinzhu/Desktop/lower-face-synthesize/1prefilter.mp4'
+#    mp4_path = 'C:/Users/xinzhu/Desktop/lower-face-synthesize/1prefilter.mp4'
+    mp4_path = 'output/2teeth.avi'
     save_path = 'tmp/'
     util2(mp4_path, save_path)
