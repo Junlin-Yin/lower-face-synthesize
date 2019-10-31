@@ -8,23 +8,12 @@ This is a temporary script file.
 import os
 import cv2
 import numpy as np
-from subprocess import call
 from __init__ import inp_dir, tar_dir, outp_dir, Square
 from candidate import preprocess, weighted_median
 from teeth import process_proxy, process_teeth
+from visual import formMp4
 
-fps = 30
-size = (1280, 720)
-
-def combine(mp4_path, mp3_path):
-    bdir, namext = os.path.split(mp4_path)
-    name, _ = os.path.splitext(namext)
-    outp_path = bdir + '/' + name + '.mp4'
-    command = 'ffmpeg -i ' + mp4_path + ' -i ' + mp3_path + ' -c:v copy -c:a aac -strict experimental ' + outp_path
-    call(command)
-    return outp_path
-
-def lowerface(sq, mp3_path, inp_path, tar_path, avi_path=None, rsize=300, preproc=False):
+def lowerface(sq, mp3_path, inp_path, tar_path, res_path=None, rsize=300, preproc=False):
     # preprocess target video
     inp_dir, filename = os.path.split(inp_path)
     inp_id, _ = os.path.splitext(filename)
@@ -36,39 +25,65 @@ def lowerface(sq, mp3_path, inp_path, tar_path, avi_path=None, rsize=300, prepro
     if preproc or os.path.exists(tmp_path) == False:
         preprocess(tar_path, tmp_path, rsize)
     
-    # load target data  
+    # load target data and clip them
     tgtdata = np.load(tmp_path)
     tgtS, tgtI = tgtdata['landmarks'], tgtdata['textures']
-    
-    # clip target textures
     boundary = sq.align(tgtI.shape[1])      # (left, right, upper, lower)
     tgtI = tgtI[:, boundary[2]:boundary[3], boundary[0]:boundary[1], :]
     
-    # load input data
+    # load input data and proxy data
     inpdata = np.load(inp_path)
     nfr = inpdata.shape[0]
-    
-    # load proxy landmarks and filters
     pxyF, pxyS = process_proxy(rsize)
     
     # create every frame and form a mp4
-    avi_path = '%s%s-x-%s.avi' % (outp_dir, inp_id, tar_id, ) if avi_path is None else avi_path
+    res_path = '%s%s-x-%s.npy' % (outp_dir, inp_id, tar_id, ) if res_path is None else res_path
+    outpdata = []
     print('Start to create new video...')
-    writer = cv2.VideoWriter(avi_path, cv2.VideoWriter_fourcc(*'DIVX'), fps, size)
     for cnt, inpS in enumerate(inpdata):
-        print("%s: %04d/%04d" % (avi_path, cnt+1, nfr))
+        print("%s: %04d/%04d" % (res_path, cnt+1, nfr))
         tmpI, tmpS = weighted_median(inpS, tgtS, tgtI)
         outpI = process_teeth(tmpI, tmpS, pxyF, pxyS, rsize, boundary)
- 
-        H, W, _ = outpI.shape
-        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-        upper, left = (360, 560)
-        frame[upper:upper+H, left:left+W, :] = outpI
-        writer.write(frame)
-        
-    outp_path = combine(avi_path, mp3_path)
-    return outp_path
+        outpdata.append(outpI)
+    outpdata = np.array(outpdata)
+    np.save(res_path, outpdata)
+    
+    return res_path
 
+def util1(mp4_path, startfr=3235, endfr=None):
+    # eliminate frames spoiled by facefrontal()
+    cap = cv2.VideoCapture(mp4_path)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, startfr)
+    cnt = startfr
+    endfr = cap.get(cv2.CAP_PROP_FRAME_COUNT) if endfr is None else endfr
+    print('Start preprocessing...')
+    while cap.isOpened():
+        if cnt == endfr:
+            break
+        print("%04d/%04d" % (cnt, endfr-1))
+        cnt += 1
+        
+        _, img = cap.read()
+        cv2.imshow('', img)
+        cv2.waitKey(0)
+        
+def util2(mp4_path, save_path, startfr=0, endfr=None):
+    # extract every frame from result video
+    cap = cv2.VideoCapture(mp4_path)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, startfr)
+    cnt = startfr
+    endfr = cap.get(cv2.CAP_PROP_FRAME_COUNT) if endfr is None else endfr
+    print('Start preprocessing...')
+    while cap.isOpened():
+        if cnt == endfr:
+            break
+        print("%04d/%04d" % (cnt, endfr-1))
+        cnt += 1
+        _, img = cap.read()
+        img = img[360:360+120, 560:560+150]
+        cv2.imwrite('%s%04d_t1.png' % (save_path, cnt-1), img)
+    print('Done')
+    
 if __name__ == '__main__':
     inp_id  = "test036"
     tar_id  = "target001"
@@ -79,7 +94,8 @@ if __name__ == '__main__':
     mp3_path  = inp_dir + inp_id + ".mp3"
     inp_path  = inp_dir + inp_id + "_ldmks.npy"
     tar_path  = tar_dir + tar_id + ".mp4"
-    avi_path  = 'output/2teeth.avi'
-    outp_path = lowerface(sq, mp3_path, inp_path, tar_path, avi_path, rsize, preproc)
-    print('Lower face synthesized at path %s' % outp_path)
+    res_path  = 'output/i36t1.npy'
+    res_path  = lowerface(sq, mp3_path, inp_path, tar_path, res_path, rsize, preproc)
+    vid_path  = formMp4(res_path, mp3_path)
+    print('Lower face synthesized at path %s' % vid_path)
     

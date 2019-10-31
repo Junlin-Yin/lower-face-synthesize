@@ -135,11 +135,11 @@ def process_teeth(inpI, inpS, pxyF, pxyS, rsize, boundary, hsvU=teeth_hsv_upper,
     # enhance lower region
     tmpI = local_enhancement(tmpI, inpS, pxyF['lower'], pxyS['lower'], regionL, rsize, boundary, 'lower')
     # sharpening
-#    outpI = sharpen(tmpI)
-    outpI = tmpI
+    outpI = sharpen(tmpI)
     return outpI 
 
 def test1():
+    # tuning parameters in proxy processing
     from candidate import weighted_median
     sq = Square(0.25, 0.75, 0.6, 1.00)
     n     = 100
@@ -166,6 +166,7 @@ def test1():
     cv2.imwrite('reference/spec_k=1.png', specI)
   
 def test2():
+    # tuning parameters in sharpening
     kz    = 15
     sigmas= [1, 2e1, 4e1, 6e1, 8e1, 1e2]
     ks    = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
@@ -182,6 +183,7 @@ def test2():
     cv2.imwrite('reference/spec_sharp_kz%d.png'%kz, specI)
 
 def test3():
+    # tuning parameters in teeth region detection
     from candidate import weighted_median
     indices = [10, 33, 45, 52, 111, 544, 1390]
     biases  = [1, 2, 3, 4, 5]
@@ -209,6 +211,7 @@ def test3():
     cv2.imwrite('reference/spec_bUs_bL%d.png' % (bL), specI)
 
 def test4():
+    # select upper or lower teeth proxy
     tar_path = 'target/target001.mp4'
     fr = 3261
     mode = 'upper'
