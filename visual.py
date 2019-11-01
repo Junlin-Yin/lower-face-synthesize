@@ -1,12 +1,23 @@
 # -*- coding: utf-8 -*-
 
 import os
+import math
 import cv2
+import librosa
 import numpy as np
 from subprocess import call
 
 vfps = 30
 size = (1280, 720)
+
+def align2audio(data, mp3_path):
+    n = 100
+    wave, sr = librosa.load(mp3_path, sr=vfps*n)
+    Nfr = math.ceil(wave.shape[0] / n)
+    line = data[-1]
+    tail = np.array([line]*(Nfr-data.shape[0]))
+    newdata = np.concatenate([data, tail], axis=0)
+    return newdata
 
 def combine(mp4_path, mp3_path):
     bdir, namext = os.path.split(mp4_path)
@@ -36,4 +47,4 @@ def formMp4(res_path, mp3_path, avi_path=None, fps=vfps, size=size):
     return video_path
 
 if __name__ == '__main__':
-    print('Hello, World!')
+    formMp4('output/i36t1.npy', 'input/test036.mp3', 'output/i36t1.avi')

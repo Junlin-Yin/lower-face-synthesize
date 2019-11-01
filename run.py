@@ -11,7 +11,7 @@ import numpy as np
 from __init__ import inp_dir, tar_dir, outp_dir, Square, detector
 from candidate import preprocess, weighted_median
 from teeth import process_proxy, process_teeth
-from visual import formMp4
+from visual import align2audio, formMp4
 
 def lowerface(sq, mp3_path, inp_path, tar_path, res_path=None, rsize=300, preproc=False):
     # preprocess target video
@@ -46,6 +46,7 @@ def lowerface(sq, mp3_path, inp_path, tar_path, res_path=None, rsize=300, prepro
         outpI = process_teeth(tmpI, tmpS, pxyF, pxyS, rsize, boundary)
         outpdata.append(outpI)
     outpdata = np.array(outpdata)
+    outpdata = align2audio(outpdata, mp3_path)
     np.save(res_path, outpdata)
     
     return res_path  
