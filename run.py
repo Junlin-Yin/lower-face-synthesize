@@ -8,7 +8,7 @@ This is a temporary script file.
 import os
 import cv2
 import numpy as np
-from __init__ import inp_dir, tar_dir, outp_dir, Square
+from __init__ import inp_dir, tar_dir, outp_dir, Square, detector
 from candidate import preprocess, weighted_median
 from teeth import process_proxy, process_teeth
 from visual import formMp4
@@ -48,26 +48,9 @@ def lowerface(sq, mp3_path, inp_path, tar_path, res_path=None, rsize=300, prepro
     outpdata = np.array(outpdata)
     np.save(res_path, outpdata)
     
-    return res_path
-
-def util1(mp4_path, startfr=3235, endfr=None):
-    # eliminate frames spoiled by facefrontal()
-    cap = cv2.VideoCapture(mp4_path)
-    cap.set(cv2.CAP_PROP_POS_FRAMES, startfr)
-    cnt = startfr
-    endfr = cap.get(cv2.CAP_PROP_FRAME_COUNT) if endfr is None else endfr
-    print('Start preprocessing...')
-    while cap.isOpened():
-        if cnt == endfr:
-            break
-        print("%04d/%04d" % (cnt, endfr-1))
-        cnt += 1
+    return res_path  
         
-        _, img = cap.read()
-        cv2.imshow('', img)
-        cv2.waitKey(0)
-        
-def util2(mp4_path, save_path, startfr=0, endfr=None):
+def util1(mp4_path, save_path, startfr=0, endfr=None):
     # extract every frame from result video
     cap = cv2.VideoCapture(mp4_path)
     cap.set(cv2.CAP_PROP_POS_FRAMES, startfr)
@@ -77,14 +60,14 @@ def util2(mp4_path, save_path, startfr=0, endfr=None):
     while cap.isOpened():
         if cnt == endfr:
             break
-        print("%04d/%04d" % (cnt, endfr-1))
+#        print("%04d/%04d" % (cnt, endfr-1))
         cnt += 1
         _, img = cap.read()
-        img = img[360:360+120, 560:560+150]
-        cv2.imwrite('%s%04d_t1.png' % (save_path, cnt-1), img)
+#        img = img[360:360+120, 560:560+150]
+        cv2.imwrite('%s%04d.png' % (save_path, cnt-1), img)
     print('Done')
-    
-if __name__ == '__main__':
+
+def run():
     inp_id  = "test036"
     tar_id  = "target001"
     sq = Square(0.25, 0.75, 0.6, 1.00)
@@ -94,8 +77,10 @@ if __name__ == '__main__':
     mp3_path  = inp_dir + inp_id + ".mp3"
     inp_path  = inp_dir + inp_id + "_ldmks.npy"
     tar_path  = tar_dir + tar_id + ".mp4"
-    res_path  = 'output/i36t1.npy'
+    res_path  = 'output/3sharp0.5.npy'
     res_path  = lowerface(sq, mp3_path, inp_path, tar_path, res_path, rsize, preproc)
     vid_path  = formMp4(res_path, mp3_path)
     print('Lower face synthesized at path %s' % vid_path)
-    
+
+if __name__ == '__main__':
+     run()

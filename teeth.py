@@ -120,7 +120,7 @@ def local_enhancement(inpI, inpS, pxyF, pxyS, region, rsize, boundary, mode):
                 outpI[y_pt, x_pt, c] = 255 - 2*(255-outpI[y_pt, x_pt, c])*(1-pxyF[y_pxy, x_pxy, c])
     return outpI
 
-def sharpen(inpI, ksize=(15, 15), sigma=2e1, k=0.5):
+def sharpen(inpI, ksize=(15, 15), sigma=1.0, k=0.5):
     smooth_inpI = cv2.GaussianBlur(inpI, ksize, sigma)
     outpI = (inpI.astype(np.float) - smooth_inpI.astype(np.float))*k + inpI.astype(np.float)
     outpI[outpI < 0]   = 0
@@ -168,7 +168,7 @@ def test1():
 def test2():
     # tuning parameters in sharpening
     kz    = 15
-    sigmas= [1, 2e1, 4e1, 6e1, 8e1, 1e2]
+    sigmas= [1, 2, 3, 4, 5]
     ks    = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
     inpI = cv2.imread('reference/0025_teeth.png')
     H, W, C = inpI.shape
@@ -178,7 +178,7 @@ def test2():
             print('%g - %g' % (sigma, k))
             outpI = sharpen(inpI, ksize=(kz, kz), sigma=sigma, k=k)
             specI[y*H:y*H+H, x*W:x*W+W, :] = outpI
-            if sigma == 2e1 and k == 0.5:
+            if sigma == 2 and k == 0.5:
                 cv2.imwrite('reference/0025_final.png', outpI)
     cv2.imwrite('reference/spec_sharp_kz%d.png'%kz, specI)
 
@@ -218,4 +218,4 @@ def test4():
     select_proxy(tar_path, mode, fr)
 
 if __name__ == '__main__':
-    test3()
+    test2()
